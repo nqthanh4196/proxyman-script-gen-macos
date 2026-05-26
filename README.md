@@ -15,6 +15,14 @@ cd proxyman-script-gen-macos
 open build/ProxymanScriptGen.app
 ```
 
+## Install Command (mở từ mọi nơi)
+
+```bash
+./install.sh
+```
+
+Sau đó gõ `proxyman` ở bất kỳ terminal nào để mở app.
+
 ## Cách sử dụng
 
 1. Paste JSON response cần mock vào ô input
