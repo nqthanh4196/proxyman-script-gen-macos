@@ -83,6 +83,19 @@ Sources/
 open build/ProxymanScriptGen.app  # Mở app
 ```
 
+### 7. App Icon (`AppIcon.icns`)
+- Tạo từ design reference `stitch_proxyman_json_converter/Icon/screen.png`
+- Squircle tối (obsidian) + dấu `{ }` neon xanh + tia sét bạc
+- Đầy đủ sizes: 16x16 → 1024x1024 (Retina)
+- Cập nhật `build.sh` để copy icon vào `Contents/Resources/` và thêm `CFBundleIconFile` vào Info.plist
+
+## Cấu trúc Icon
+
+```
+AppIcon.iconset/          # Source PNG files (all sizes)
+AppIcon.icns              # Compiled macOS icon file
+```
+
 ## Tech Stack
 - Swift 5.9 / SwiftUI
 - macOS 13+ (Ventura)
