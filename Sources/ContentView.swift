@@ -6,12 +6,18 @@ struct ContentView: View {
     @State private var outputScript = ""
     @State private var errorMessage = ""
     @State private var successMessage = ""
+    @State private var isGenerating = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Proxyman Script Generator")
-                .font(.headline)
-                .foregroundColor(Color(red: 0.31, green: 0.76, blue: 0.97))
+            HStack {
+                Text("Proxyman Script Generator")
+                    .font(.headline)
+                    .foregroundColor(Color(red: 0.31, green: 0.76, blue: 0.97))
+                Text("v1.2.0")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
 
             Text("Paste JSON response đầy đủ:")
                 .font(.caption)
@@ -47,9 +53,15 @@ struct ContentView: View {
                 Spacer()
                 Button("Clear") { clearAll() }
                     .buttonStyle(.bordered)
+                if isGenerating {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.horizontal, 8)
+                }
                 Button("Generate") { generate() }
                     .buttonStyle(.borderedProminent)
                     .tint(Color(red: 0.31, green: 0.76, blue: 0.97))
+                    .disabled(isGenerating)
             }
 
             if !outputScript.isEmpty {
@@ -57,18 +69,9 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundColor(.gray)
 
-                ScrollView {
-                    Text(outputScript)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(Color(white: 0.71))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
-                }
-                .frame(minHeight: 150)
-                .padding(12)
-                .background(Color(white: 0.1))
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(white: 0.2)))
+                CodeTextView(text: outputScript)
+                    .frame(minHeight: 150)
+                    .cornerRadius(8)
 
                 HStack {
                     Spacer()
@@ -93,24 +96,46 @@ struct ContentView: View {
             return
         }
 
-        guard let data = trimmed.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data),
-              let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
-              let prettyJSON = String(data: prettyData, encoding: .utf8) else {
-            errorMessage = "JSON không hợp lệ!"
-            return
+        isGenerating = true
+        let input = trimmed
+        Task.detached(priority: .userInitiated) {
+            let result = Self.processJSON(input)
+            await MainActor.run {
+                isGenerating = false
+                switch result {
+                case .success(let script):
+                    outputScript = script
+                    successMessage = "Đã tạo script!"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { successMessage = "" }
+                case .failure:
+                    errorMessage = "JSON không hợp lệ!"
+                }
+            }
         }
-
-        outputScript = generateScript(prettyJSON: prettyJSON)
-        successMessage = "Đã tạo script!"
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { successMessage = "" }
     }
 
-    private func generateScript(prettyJSON: String) -> String {
-        let indented = prettyJSON.components(separatedBy: "\n")
-            .enumerated()
-            .map { $0.offset == 0 ? $0.element : "    \($0.element)" }
-            .joined(separator: "\n")
+    private nonisolated static func processJSON(_ trimmed: String) -> Result<String, Error> {
+        // Validate JSON only, skip re-serialization for speed
+        guard let data = trimmed.data(using: .utf8),
+              (try? JSONSerialization.jsonObject(with: data)) != nil else {
+            return .failure(NSError(domain: "", code: 0))
+        }
+        // Use raw input directly (already valid JSON) — avoid expensive pretty-print + sort
+        return .success(generateScript(rawJSON: trimmed))
+    }
+
+    private nonisolated static func generateScript(rawJSON: String) -> String {
+        // Indent all lines after the first by 2 spaces for the const assignment
+        let indented: String
+        if rawJSON.count > 500_000 {
+            // For very large JSON, avoid splitting into array — use as-is
+            indented = rawJSON
+        } else {
+            let lines = rawJSON.split(separator: "\n", omittingEmptySubsequences: false)
+            indented = lines.enumerated().map { offset, line in
+                offset == 0 ? String(line) : "    \(line)"
+            }.joined(separator: "\n")
+        }
 
         return """
         console.log("🔥 SCRIPT LOADED");
@@ -162,5 +187,33 @@ struct ContentView: View {
         outputScript = ""
         errorMessage = ""
         successMessage = ""
+    }
+}
+
+// MARK: - NSTextView wrapper for large text (no lag)
+struct CodeTextView: NSViewRepresentable {
+    let text: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        let textView = scrollView.documentView as! NSTextView
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.textColor = NSColor(white: 0.71, alpha: 1)
+        textView.backgroundColor = NSColor(white: 0.1, alpha: 1)
+        textView.textContainerInset = NSSize(width: 12, height: 12)
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .noBorder
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        let textView = scrollView.documentView as! NSTextView
+        if textView.string != text {
+            textView.string = text
+        }
     }
 }
