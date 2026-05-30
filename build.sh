@@ -6,9 +6,12 @@ swift build -c release
 
 APP_NAME="ProxymanScriptGen"
 APP_DIR="build/${APP_NAME}.app/Contents/MacOS"
+RESOURCES_DIR="build/${APP_NAME}.app/Contents/Resources"
 mkdir -p "$APP_DIR"
+mkdir -p "$RESOURCES_DIR"
 
 cp ".build/release/${APP_NAME}" "$APP_DIR/"
+cp "AppIcon.icns" "$RESOURCES_DIR/"
 
 cat > "build/${APP_NAME}.app/Contents/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -21,12 +24,14 @@ cat > "build/${APP_NAME}.app/Contents/Info.plist" << 'EOF'
     <string>com.nqthanh4196.proxyman-script-gen</string>
     <key>CFBundleName</key>
     <string>Proxyman Script Gen</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>2.0.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>
