@@ -357,73 +357,20 @@ struct ContentView: View {
     }
 
     private func extractTitle(from json: String) -> String {
-        if let data = json.data(using: .utf8),
-           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let endpoint = (obj["data"] as? [String: Any])?["attributes"] as? [String: Any],
-               let ep = endpoint["endpoint"] as? String {
-                return ep
-            }
-            if let type = obj["type"] as? String { return type }
-        }
-        return "Generated Script"
+        ScriptEngine.extractTitle(from: json)
     }
 
     private nonisolated static func processJSON(_ trimmed: String) -> Result<String, Error> {
-        guard let data = trimmed.data(using: .utf8),
-              (try? JSONSerialization.jsonObject(with: data)) != nil else {
-            return .failure(NSError(domain: "", code: 0))
+        switch ScriptEngine.processJSON(trimmed) {
+        case .success(let s): return .success(s)
+        case .failure(let e): return .failure(e)
         }
-        return .success(generateScript(rawJSON: trimmed))
-    }
-
-    private nonisolated static func generateScript(rawJSON: String) -> String {
-        let lines = rawJSON.split(separator: "\n", omittingEmptySubsequences: false)
-        let indented = lines.enumerated().map { offset, line in
-            offset == 0 ? String(line) : "    \(line)"
-        }.joined(separator: "\n")
-
-        return """
-        console.log("🔥 SCRIPT LOADED");
-
-        sharedState.savedResponse = null;
-
-        async function onRequest(context, url, request) {
-          console.log("➡️ onRequest:", url);
-
-          if (sharedState.savedResponse?.data) {
-            request.headers["X-Debug"] = "From-Proxyman";
-          }
-
-          return request;
-        }
-
-        async function onResponse(context, url, request, response) {
-          console.log("⬅️ onResponse:", url);
-          console.log("Status:", response.statusCode);
-
-          const MOCK_RESPONSE = \(indented);
-
-          // ✅ FORCE override response
-          response.headers["Content-Type"] = "application/json";
-          response.body = MOCK_RESPONSE;
-
-          sharedState.savedResponse = MOCK_RESPONSE;
-
-          console.log("✅ RESPONSE OVERRIDDEN");
-
-          return response;
-        }
-        """
     }
 
     private func beautify() {
-        let trimmed = inputJSON.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty,
-              let data = trimmed.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data),
-              let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
-              let pretty = String(data: prettyData, encoding: .utf8) else { return }
-        inputJSON = pretty
+        if let pretty = ScriptEngine.beautify(inputJSON) {
+            inputJSON = pretty
+        }
     }
 
     private func copyOutput() {

@@ -8,6 +8,11 @@ let package = Package(
         .executableTarget(
             name: "ProxymanScriptGen",
             path: "Sources"
+        ),
+        .testTarget(
+            name: "ProxymanScriptGenTests",
+            dependencies: ["ProxymanScriptGen"],
+            path: "Tests"
         )
     ]
 )

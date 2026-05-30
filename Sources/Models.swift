@@ -83,28 +83,38 @@ class HistoryStore: ObservableObject {
     @Published var entries: [HistoryEntry] = []
 
     private let key = "historyEntries"
+    private var saveWorkItem: DispatchWorkItem?
 
     init() { load() }
 
     func add(_ entry: HistoryEntry) {
         entries.insert(entry, at: 0)
-        save()
+        debouncedSave()
     }
 
     func clearAll() {
         entries.removeAll()
-        save()
+        saveNow()
     }
 
     func remove(at offsets: IndexSet) {
         entries.remove(atOffsets: offsets)
-        save()
+        debouncedSave()
     }
 
-    private func save() {
+    /// Force immediate save (for tests or app termination)
+    func saveNow() {
+        saveWorkItem?.cancel()
         if let data = try? JSONEncoder().encode(entries) {
             UserDefaults.standard.set(data, forKey: key)
         }
+    }
+
+    private func debouncedSave() {
+        saveWorkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.saveNow() }
+        saveWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: item)
     }
 
     private func load() {
